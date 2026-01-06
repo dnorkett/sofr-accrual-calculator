@@ -1,6 +1,6 @@
 const express = require("express");
-const { eachDayInclusive, toISODate } = require("../utils/dates");
-const { calcTermSofrAct360 } = require("../services/accrualService");
+const { getDailyBaseRatesMap } = require("../services/rateService");
+const { calculateAccrual } = require("../services/calculationService");
 
 function calcRouter(db) {
   const router = express.Router();
@@ -9,38 +9,32 @@ function calcRouter(db) {
   router.post("/", (req, res) => {
     const { principal, spreadBps, startDate, endDate, method } = req.body;
 
-    if (!principal || !spreadBps || !startDate || !endDate) {
-      return res.status(400).json({ message: "principal, spreadBps, startDate, endDate required" });
-    }
-
-    const selected = method || "TERM_SOFR_ACT360";
-    if (selected !== "TERM_SOFR_ACT360") {
-      return res.status(400).json({ message: "Only TERM_SOFR_ACT360 supported for now" });
-    }
-
-    // Pull needed base rates from DB into a map
-    const days = eachDayInclusive(startDate, endDate).map(toISODate);
-    const stmt = db.prepare(`SELECT rate FROM base_rates WHERE date = ?`);
-    const baseRatesByDate = {};
-    for (const date of days) {
-      const row = stmt.get(date);
-      baseRatesByDate[date] = row ? row.rate : null;
+    // NOTE: use == null so 0 is allowed (spreadBps can be 0)
+    if (principal == null || spreadBps == null || !startDate || !endDate) {
+      return res.status(400).json({
+        message: "principal, spreadBps, startDate, endDate required",
+      });
     }
 
     try {
-      const result = calcTermSofrAct360({
+      const { baseRatesByDate } = getDailyBaseRatesMap(db, startDate, endDate);
+
+      const result = calculateAccrual({
         principal,
         spreadBps,
         startDate,
         endDate,
+        method,
         baseRatesByDate,
       });
+
       res.json(result);
     } catch (e) {
-        const msg = e.message || "Calculation failed";
-        const hint = msg.startsWith("Missing base rate") 
-            ? "Try a date range within the seeded demo window (01/01/2026 - 01/10/2026), or add rates using the rate API" 
-            : undefined;
+      const msg = e.message || "Calculation failed";
+      const hint = msg.startsWith("Missing base rate")
+        ? "Try a date range within the seeded demo window, or extend seed data in server/src/db/init.js."
+        : undefined;
+
       res.status(400).json({ message: msg, hint });
     }
   });
