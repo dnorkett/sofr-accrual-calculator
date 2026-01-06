@@ -2,7 +2,6 @@ const express = require("express");
 const { eachDayInclusive, toISODate } = require("../utils/dates");
 const { calcTermSofrAct360 } = require("../services/accrualService");
 
-
 function calcRouter(db) {
   const router = express.Router();
 
@@ -38,7 +37,11 @@ function calcRouter(db) {
       });
       res.json(result);
     } catch (e) {
-      res.status(400).json({ message: e.message });
+        const msg = e.message || "Calculation failed";
+        const hint = msg.startsWith("Missing base rate") 
+            ? "Try a date range within the seeded demo window (01/01/2026 - 01/10/2026), or add rates using the rate API" 
+            : undefined;
+      res.status(400).json({ message: msg, hint });
     }
   });
 
