@@ -1,21 +1,26 @@
 const { toISODate, eachDayInclusive, daysAct360Fraction } = require("../utils/dates");
 
-// Accept spread in basis points (bps) and convert to a decimal rate.
+// accept spread in basis points (bps) and convert to a decimal rate.
 // Example: 250 bps => 0.025
 function bpsToDecimal(bps) {
-  return Number(bps) / 10000; // 250 bps => 0.025
+  return Number(bps) / 10000;
 }
 
 function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRatesByDate }) {
-    const p = Number(principal);
-    if (!Number.isFinite(p) || p <= 0) throw new Error("Invalid principal");
+  const p = Number(principal);
+  if (!Number.isFinite(p) || p <= 0) {
+    throw new Error("Invalid principal. Must be a positive number.");
+  }
 
-    const spreadBpsNum = Number(spreadBps);
-    if (!Number.isFinite(spreadBpsNum) || spreadBpsNum < 0) throw new Error("Invalid spreadBps");
-    
-    const spread = bpsToDecimal(spreadBpsNum);
+  const spreadBpsNum = Number(spreadBps);
+  if (!Number.isFinite(spreadBpsNum) || spreadBpsNum < 0) {
+    throw new Error("Invalid spreadBps. Must be 0 or greater.");
+  }
 
-    const days = eachDayInclusive(startDate, endDate);
+  const spread = bpsToDecimal(spreadBpsNum);
+  const days = eachDayInclusive(startDate, endDate);
+
+  const dcf = daysAct360Fraction(1); // 1 day ACT/360
 
   let totalInterest = 0;
   const daily = [];
@@ -25,17 +30,14 @@ function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRate
     const baseRate = baseRatesByDate[iso];
 
     if (baseRate == null) {
-      // You can choose: error, or skip, or nearest previous
-      // For portfolio simplicity: throw a clear error
       throw new Error(`Missing base rate for ${iso}. Seed DB or extend rate range.`);
     }
 
     const allInRate = baseRate + spread; // annualized decimal
-    const dcf = daysAct360Fraction(1); // 1 day ACT/360
-
     const interest = p * allInRate * dcf;
 
     totalInterest += interest;
+
     daily.push({
       date: iso,
       baseRate,
@@ -50,7 +52,7 @@ function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRate
   return {
     method: "TERM_SOFR_ACT360",
     principal: p,
-    spreadBps: Number(spreadBps),
+    spreadBps: spreadBpsNum,
     startDate,
     endDate,
     totalInterest,
