@@ -90,3 +90,11 @@ summary { cursor: pointer; color: var(--text); }
 
 .error { color: var(--danger); margin-top: 10px; }
 .note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+button.secondary {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.06);
+}
+button.secondary:hover {
+  background: rgba(255,255,255,.10);
+}

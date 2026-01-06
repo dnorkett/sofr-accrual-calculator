@@ -4,7 +4,10 @@ const API_BASE = "http://localhost:3001";
 
 function fmtMoney(x) {
   if (x == null || Number.isNaN(Number(x))) return "-";
-  return Number(x).toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return Number(x).toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+  });
 }
 
 function fmtPctDecimalToPct(x) {
@@ -49,6 +52,40 @@ function validate({ principal, spreadBps, startDate, endDate }) {
 function FieldError({ message }) {
   if (!message) return null;
   return <div className="error">{message}</div>;
+}
+
+function csvEscape(value) {
+  if (value == null) return "";
+  const s = String(value);
+  // Escape quotes by doubling them; wrap in quotes if it contains special chars
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function toCsv(rows, headers) {
+  const headerLine = headers.map(csvEscape).join(",");
+  const lines = rows.map((row) =>
+    headers.map((h) => csvEscape(row[h])).join(",")
+  );
+  return [headerLine, ...lines].join("\n");
+}
+
+function downloadTextFile(
+  filename,
+  content,
+  mimeType = "text/plain;charset=utf-8"
+) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
 }
 
 export default function App() {
@@ -127,6 +164,51 @@ export default function App() {
     }
   }
 
+  function exportCsv() {
+    if (!result) return;
+
+    // Optional: include some summary columns on every row (easy for Excel pivoting)
+    const rows = result.daily.map((r) => ({
+      startDate: result.startDate,
+      endDate: result.endDate,
+      principal: result.principal,
+      spreadBps: result.spreadBps,
+      method: result.method,
+
+      date: r.date,
+      baseRate: r.baseRate,
+      spread: r.spread,
+      allInRate: r.allInRate,
+      dayCountFraction: r.dayCountFraction,
+      dailyInterest: r.interest,
+      accruedToDate: r.accruedToDate,
+    }));
+
+    const headers = [
+      "startDate",
+      "endDate",
+      "principal",
+      "spreadBps",
+      "method",
+      "date",
+      "baseRate",
+      "spread",
+      "allInRate",
+      "dayCountFraction",
+      "dailyInterest",
+      "accruedToDate",
+    ];
+
+    const csv = toCsv(rows, headers);
+
+    // Nice filename for a portfolio app
+    const safeStart = (result.startDate || "start").replaceAll(":", "-");
+    const safeEnd = (result.endDate || "end").replaceAll(":", "-");
+    const filename = `sofr-accrual_${safeStart}_to_${safeEnd}.csv`;
+
+    downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+  }
+
   return (
     <div className="container">
       <div className="header">
@@ -197,7 +279,8 @@ export default function App() {
             </div>
 
             <div className="note" style={{ alignSelf: "end" }}>
-              The Secured Overnight Financing Rate (SOFR) is published daily by the Federal Reserve Bank of New York on its website, usually around 8 a.m. ET on U.S. business days.
+              The Secured Overnight Financing Rate (SOFR) is published daily by the Federal Reserve
+              Bank of New York on its website, usually around 8 a.m. ET on U.S. business days.
             </div>
           </div>
 
@@ -227,6 +310,10 @@ export default function App() {
                 <div className="label">Method</div>
                 <div className="value">{result.method}</div>
               </div>
+            </div>
+
+            <div className="actions" style={{ marginTop: 12 }}>
+              <button onClick={exportCsv}>Export CSV</button>
             </div>
 
             <details style={{ marginTop: 12 }}>
