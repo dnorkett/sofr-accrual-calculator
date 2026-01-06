@@ -9,6 +9,7 @@ const { calcRouter } = require("./routes/calc");
 
 const app = express();
 
+//Middleware
 app.use(express.json());
 
 app.use(
@@ -17,9 +18,11 @@ app.use(
   })
 );
 
+//Database
 const db = openDb(process.env.DB_PATH || "./data/app.db");
 initDb(db);
 
+//Routes
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
