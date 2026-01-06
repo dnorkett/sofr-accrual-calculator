@@ -1,16 +1,21 @@
 const { toISODate, eachDayInclusive, daysAct360Fraction } = require("../utils/dates");
 
-// spread can be provided as percent (e.g. 2.50) or bps (e.g. 250)
-// we’ll accept bps in API for clarity and convert to decimal
+// Accept spread in basis points (bps) and convert to a decimal rate.
+// Example: 250 bps => 0.025
 function bpsToDecimal(bps) {
   return Number(bps) / 10000; // 250 bps => 0.025
 }
 
 function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRatesByDate }) {
-  const p = Number(principal);
-  const spread = bpsToDecimal(spreadBps);
+    const p = Number(principal);
+    if (!Number.isFinite(p) || p <= 0) throw new Error("Invalid principal");
 
-  const days = eachDayInclusive(startDate, endDate);
+    const spreadBpsNum = Number(spreadBps);
+    if (!Number.isFinite(spreadBpsNum) || spreadBpsNum < 0) throw new Error("Invalid spreadBps");
+    
+    const spread = bpsToDecimal(spreadBpsNum);
+
+    const days = eachDayInclusive(startDate, endDate);
 
   let totalInterest = 0;
   const daily = [];

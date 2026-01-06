@@ -3,11 +3,15 @@ function toISODate(d) {
 }
 
 function parseISODate(s) {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    throw new Error(`Invalid date format (expected YYYY-MM-DD): ${s}`);
+  }
   const d = new Date(`${s}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) throw new Error(`Invalid date: ${s}`);
   return d;
 }
 
+// Returns an array of Date objects for each day from start to end, inclusive.
 function eachDayInclusive(startISO, endISO) {
   const start = parseISODate(startISO);
   const end = parseISODate(endISO);
