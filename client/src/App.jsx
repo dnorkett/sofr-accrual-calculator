@@ -272,9 +272,9 @@ export default function App() {
 
           <div className="row" style={{ marginTop: 12 }}>
             <div>
-              <label>Accrual Method</label>
+              <label>Day Count Convention</label>
               <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                <option value="ACT_ACT">ACT/ACT (365/366)</option>
+                <option value="ACT_ACT">TERM SOFR (ACT/ACT)</option>
                 <option value="TERM_SOFR_ACT360">TERM SOFR (ACT/360)</option>
               </select>
             </div>
