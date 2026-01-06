@@ -1,25 +1,18 @@
-const { calcTermSofrAct360 } = require("./accrualService");
+const { calcTermSofrAct360, calcActAct } = require("./accrualService");
 
-/**
- * Minimal orchestration layer:
- * - chooses method
- * - calls the appropriate calculator
- * - keeps a consistent error surface for routes
- */
 function calculateAccrual({ principal, spreadBps, startDate, endDate, method, baseRatesByDate }) {
-  const selected = method || "TERM_SOFR_ACT360";
+  const selected = method || "ACT_ACT"; // NEW DEFAULT
 
-  if (selected !== "TERM_SOFR_ACT360") {
-    throw new Error("Only TERM_SOFR_ACT360 supported for now");
+  if (selected === "ACT_ACT") {
+    return calcActAct({ principal, spreadBps, startDate, endDate, baseRatesByDate });
   }
 
-  return calcTermSofrAct360({
-    principal,
-    spreadBps,
-    startDate,
-    endDate,
-    baseRatesByDate,
-  });
+  if (selected === "TERM_SOFR_ACT360") {
+    return calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRatesByDate });
+  }
+
+  throw new Error("Unsupported method");
 }
 
 module.exports = { calculateAccrual };
+

@@ -93,7 +93,7 @@ export default function App() {
   const [spreadBps, setSpreadBps] = useState("250");
   const [startDate, setStartDate] = useState("2026-01-01");
   const [endDate, setEndDate] = useState("2026-01-10");
-  const [method, setMethod] = useState("TERM_SOFR_ACT360");
+  const [method, setMethod] = useState("ACT_ACT");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -274,6 +274,7 @@ export default function App() {
             <div>
               <label>Accrual Method</label>
               <select value={method} onChange={(e) => setMethod(e.target.value)}>
+                <option value="ACT_ACT">ACT/ACT (365/366)</option>
                 <option value="TERM_SOFR_ACT360">TERM SOFR (ACT/360)</option>
               </select>
             </div>
