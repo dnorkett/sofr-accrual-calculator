@@ -1,6 +1,6 @@
 const { toISODate, eachDayInclusive, daysAct360Fraction } = require("../utils/dates");
 
-// accept spread in basis points (bps) and convert to a decimal rate.
+// Accept spread in basis points (bps) and convert to a decimal rate.
 // Example: 250 bps => 0.025
 function bpsToDecimal(bps) {
   return Number(bps) / 10000;
@@ -16,7 +16,13 @@ function daysInYearForISO(isoDate) {
   return isLeapYear(year) ? 366 : 365;
 }
 
-function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRatesByDate }) {
+function calcTermSofrAct360({
+  principal,
+  spreadBps,
+  startDate,
+  endDate,
+  baseRatesByDate,
+}) {
   const p = Number(principal);
   if (!Number.isFinite(p) || p <= 0) {
     throw new Error("Invalid principal. Must be a positive number.");
@@ -40,7 +46,9 @@ function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRate
     const baseRate = baseRatesByDate[iso];
 
     if (baseRate == null) {
-      throw new Error(`Missing base rate for ${iso}. Seed DB or extend rate range.`);
+      throw new Error(
+        `Missing base rate for ${iso}. Seed DB or extend rate range.`
+      );
     }
 
     const allInRate = baseRate + spread; // annualized decimal
@@ -60,7 +68,7 @@ function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRate
   }
 
   return {
-    method: "TERM_SOFR_ACT360",
+    method: "TERM_SOFR_ACT_360",
     principal: p,
     spreadBps: spreadBpsNum,
     startDate,
@@ -71,10 +79,24 @@ function calcTermSofrAct360({ principal, spreadBps, startDate, endDate, baseRate
   };
 }
 
-function calcActAct({ principal, spreadBps, startDate, endDate, baseRatesByDate }) {
+function calcTermSofrActAct({
+  principal,
+  spreadBps,
+  startDate,
+  endDate,
+  baseRatesByDate,
+}) {
   const p = Number(principal);
-  const spread = bpsToDecimal(spreadBps);
+  if (!Number.isFinite(p) || p <= 0) {
+    throw new Error("Invalid principal. Must be a positive number.");
+  }
 
+  const spreadBpsNum = Number(spreadBps);
+  if (!Number.isFinite(spreadBpsNum) || spreadBpsNum < 0) {
+    throw new Error("Invalid spreadBps. Must be 0 or greater.");
+  }
+
+  const spread = bpsToDecimal(spreadBpsNum);
   const days = eachDayInclusive(startDate, endDate);
 
   let totalInterest = 0;
@@ -85,7 +107,9 @@ function calcActAct({ principal, spreadBps, startDate, endDate, baseRatesByDate 
     const baseRate = baseRatesByDate[iso];
 
     if (baseRate == null) {
-      throw new Error(`Missing base rate for ${iso}. Seed DB or extend rate range.`);
+      throw new Error(
+        `Missing base rate for ${iso}. Seed DB or extend rate range.`
+      );
     }
 
     const allInRate = baseRate + spread; // annualized decimal
@@ -95,6 +119,7 @@ function calcActAct({ principal, spreadBps, startDate, endDate, baseRatesByDate 
     const interest = p * allInRate * dcf;
 
     totalInterest += interest;
+
     daily.push({
       date: iso,
       baseRate,
@@ -107,9 +132,9 @@ function calcActAct({ principal, spreadBps, startDate, endDate, baseRatesByDate 
   }
 
   return {
-    method: "ACT_ACT",
+    method: "TERM_SOFR_ACT_ACT",
     principal: p,
-    spreadBps: Number(spreadBps),
+    spreadBps: spreadBpsNum,
     startDate,
     endDate,
     totalInterest,
@@ -118,5 +143,4 @@ function calcActAct({ principal, spreadBps, startDate, endDate, baseRatesByDate 
   };
 }
 
-
-module.exports = { calcTermSofrAct360, calcActAct };
+module.exports = { calcTermSofrAct360, calcTermSofrActAct };
