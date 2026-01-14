@@ -64,17 +64,11 @@ function csvEscape(value) {
 
 function toCsv(rows, headers) {
   const headerLine = headers.map(csvEscape).join(",");
-  const lines = rows.map((row) =>
-    headers.map((h) => csvEscape(row[h])).join(",")
-  );
+  const lines = rows.map((row) => headers.map((h) => csvEscape(row[h])).join(","));
   return [headerLine, ...lines].join("\n");
 }
 
-function downloadTextFile(
-  filename,
-  content,
-  mimeType = "text/plain;charset=utf-8"
-) {
+function downloadTextFile(filename, content, mimeType = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
 
@@ -101,6 +95,9 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+
   // Track what the user has interacted with, so we don't spam errors immediately.
   const [touched, setTouched] = useState({});
 
@@ -123,6 +120,34 @@ export default function App() {
   const canSubmit = useMemo(() => {
     return principal && spreadBps && startDate && endDate && method;
   }, [principal, spreadBps, startDate, endDate, method]);
+
+  async function importLatestRates() {
+    if (importing) return;
+
+    setImporting(true);
+    setImportMsg("");
+
+    try {
+      const res = await fetch(`${API_BASE}/api/rates/import-latest`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Import failed");
+      }
+
+      const note = data.note ? ` (${data.note})` : "";
+      setImportMsg(
+        `Imported ${data.upsertedCount} rates (requested ${data.lookbackDaysRequested} days).${note}`
+      );
+    } catch (e) {
+      setImportMsg(e.message);
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function calculate() {
     if (loading) return;
@@ -169,7 +194,6 @@ export default function App() {
   function exportCsv() {
     if (!result) return;
 
-    // Optional: include some summary columns on every row (easy for Excel pivoting)
     const rows = result.daily.map((r) => ({
       startDate: result.startDate,
       endDate: result.endDate,
@@ -203,7 +227,6 @@ export default function App() {
 
     const csv = toCsv(rows, headers);
 
-    // Nice filename for a portfolio app
     const safeStart = (result.startDate || "start").replaceAll(":", "-");
     const safeEnd = (result.endDate || "end").replaceAll(":", "-");
     const filename = `sofr-accrual_${safeStart}_to_${safeEnd}.csv`;
@@ -276,7 +299,7 @@ export default function App() {
             <div>
               <label>Day Count Convention</label>
               <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                <option value="TERM_SOFR_ACT_ACT">TERM SOFR (ACT/ACT 365/366)</option>
+                <option value="TERM_SOFR_ACT_ACT">TERM SOFR (ACT/ACT)</option>
                 <option value="TERM_SOFR_ACT_360">TERM SOFR (ACT/360)</option>
               </select>
             </div>
@@ -285,6 +308,17 @@ export default function App() {
               The Secured Overnight Financing Rate (SOFR) is published daily by the Federal Reserve
               Bank of New York on its website, usually around 8 a.m. ET on U.S. business days.
             </div>
+          </div>
+
+          <div className="actions" style={{ marginTop: 12 }}>
+            <button onClick={importLatestRates} disabled={importing}>
+              {importing ? "Importing…" : "Import latest rates"}
+            </button>
+            {importMsg && (
+              <div className="note" style={{ marginTop: 8 }}>
+                {importMsg}
+              </div>
+            )}
           </div>
 
           <div className="actions">
