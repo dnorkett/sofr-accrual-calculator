@@ -1,5 +1,5 @@
 const express = require("express");
-const { getDailyBaseRatesMap } = require("../services/rateService");
+const { getDailyBaseRatesMapCarryForward } = require("../services/rateService");
 const { calculateAccrual } = require("../services/calculationService");
 
 function calcRouter(db) {
@@ -17,7 +17,7 @@ function calcRouter(db) {
     }
 
     try {
-      const { baseRatesByDate } = getDailyBaseRatesMap(db, startDate, endDate);
+      const { baseRatesByDate } = getDailyBaseRatesMapCarryForward(db, startDate, endDate);
 
       const result = calculateAccrual({
         principal,
