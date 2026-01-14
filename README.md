@@ -1,7 +1,7 @@
 # SOFR Interest Accrual Calculator
 **React + Express + SQLite**
 
-A portfolio project that demonstrates a modern frontend communicating with a backend REST API to calculate loan interest using TERM SOFR–style daily accruals. Users enter loan inputs (principal, spread, dates), while SOFR base rates are sourced from the New York Fed, stored locally, and applied server-side using industry-standard day count conventions.
+A project that demonstrates a modern frontend communicating with a backend REST API to calculate loan interest using TERM SOFR–style daily accruals. Users enter loan inputs (principal, spread, dates), while SOFR base rates are sourced from the New York Fed, stored locally, and applied server-side using industry-standard day count conventions.
 
 ---
 
@@ -56,7 +56,7 @@ It is meant to be readable, extensible, and explainable, not over-engineered.
 - Export daily accruals to CSV
 
 ### Accrual methods
-- TERM SOFR (ACT/ACT, 365/366) — default
+- TERM SOFR (ACT/ACT) — default
 - TERM SOFR (ACT/360)
 
 ### Rate handling
