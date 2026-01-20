@@ -274,7 +274,7 @@ export default function App() {
     <div className="container">
       <div className="header">
         <h1>SOFR Interest Accrual Calculator</h1>
-        <p>React UI → Express API → SQLite</p>
+        <p>A lightweight SOFR accrual engine for real-world loan scenarios.</p>
       </div>
 
       <div className="grid">
@@ -435,10 +435,6 @@ export default function App() {
               </div>
             </div>
 
-            <div className="actions" style={{ marginTop: 12 }}>
-              <button onClick={exportCsv}>Export CSV</button>
-            </div>
-
             <details style={{ marginTop: 12 }}>
               <summary>Daily accrual breakdown ({result.daily.length} days)</summary>
               <table className="table">
@@ -464,6 +460,9 @@ export default function App() {
                 </tbody>
               </table>
             </details>
+            <div className="actions" style={{ marginTop: 12 }}>
+              <button onClick={exportCsv}>Export CSV</button>
+            </div>
           </div>
         )}
       </div>
