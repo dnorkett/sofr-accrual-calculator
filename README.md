@@ -1,23 +1,22 @@
 # SOFR Interest Accrual Calculator
 **React + Express + SQLite**
 
-A project that demonstrates a modern frontend communicating with a backend REST API to calculate loan interest using TERM SOFR–style daily accruals. Users enter loan inputs (principal, spread, dates), while SOFR base rates are sourced from the New York Fed, stored locally, and applied server-side using industry-standard day count conventions.
+A project demonstrating a modern frontend communicating with a backend REST API to calculate loan interest using **Daily Simple SOFR** with selectable **day-count conventions**. Users enter loan inputs (principal, spread, dates), while SOFR base rates are sourced from the New York Fed, stored locally, and applied server-side using realistic daily accrual practices.
 
 ---
 
 ## Why this project
 
-This project is intentionally designed to mirror how real financial systems are built:
+This project is intentionally designed to mirror real-world financial system design:
 
 - Clear separation of concerns:
-  - UI collects inputs
-  - API owns business logic
-  - Database owns market data
+  - **UI** collects inputs  
+  - **API** owns business logic  
+  - **Database** stores market data
 - Real market data ingestion (NY Fed SOFR)
 - Explicit, testable accrual logic
-- Easy local setup with no external database dependencies
-
-It is meant to be readable, extensible, and explainable, not over-engineered.
+- Easy local setup (SQLite; no external DB dependencies)
+- Clean, readable architecture suitable for demos or portfolio projects
 
 ---
 
@@ -34,59 +33,64 @@ It is meant to be readable, extensible, and explainable, not over-engineered.
 - CORS enabled for local development
 
 ### Database
-- SQLite (via `better-sqlite3`)
-- Stores daily SOFR base rates as decimals (e.g. `0.0364 = 3.64%`)
+- SQLite (`better-sqlite3`)
+- Stores daily SOFR base rates as decimals (e.g., `0.0364 = 3.64%`)
 
 ---
 
 ## Features
 
 ### Core functionality
-- Input:
-  - Principal
+- User inputs:
+  - Principal  
   - Spread (basis points)
-  - Start date
-  - End date
-- Base rate is not entered by the user
-- Interest is calculated server-side
+  - Start date  
+  - End date  
+  - **Reference rate** (currently: SOFR – Daily Simple)  
+  - **Day-count convention** (ACT/ACT or ACT/360)
+
+- Interest is calculated **server-side**
 - Results include:
   - Total interest
   - Total amount (principal + interest)
-  - Expandable daily accrual breakdown
+  - Expandable daily breakdown
 - Export daily accruals to CSV
 
-### Accrual methods
-- TERM SOFR (ACT/ACT) — default
-- TERM SOFR (ACT/360)
+### Accrual logic
+- Reference rate: **SOFR – Daily Simple**  
+- Day-count conventions:
+  - **ACT/ACT** (365 or 366)
+  - **ACT/360** (fixed 1/360)
+- Daily interest accrues for every calendar day in the range
+- Spread is applied as an annualized decimal (e.g., 250 bps → 0.025)
 
 ### Rate handling
 - Import latest SOFR rates from the New York Fed
-- Automatic handling of weekends and holidays (missing dates carry forward the most recent published rate)
+- Automatic handling of weekends/holidays:
+  - Missing dates use a **carry-forward** of the most recent business day’s rate
 
 ---
 
 ## Calculation assumptions (important)
 
-This project implements a simplified but realistic daily accrual model.
+This project implements a simplified but realistic **Daily Simple SOFR** daily accrual model.
 
 ### General rules
 - All-in rate = `baseRate + spread`
-- Base rates are stored as decimals (e.g. `0.0364 = 3.64%`)
-- Accrual is calculated daily, even on non-business days
+- Base rates stored as decimals (e.g. 0.0364 = 3.64%)
+- Daily accrual happens **every calendar day**, even on weekends & holidays
 
-### Day count conventions
+### Day-count conventions
+- **ACT/ACT**  
+  - Daily fraction = `1 / 365` or `1 / 366` depending on calendar year  
+- **ACT/360**  
+  - Daily fraction = `1 / 360`
 
-#### TERM SOFR (ACT/ACT)
-- Daily fraction = `1 / 365` or `1 / 366` (leap year aware)
-
-#### TERM SOFR (ACT/360)
-- Daily fraction = `1 / 360`
-
-### Missing rate days (weekends / holidays)
-- If no SOFR rate exists for a date, the most recent prior business day’s rate is used (carry-forward)
-- If no earlier rate exists in the database, the API returns a clear error prompting rate import
-
-> This behavior reflects common real-world loan accrual practices.
+### Missing rate days
+- If no SOFR exists for a date:
+  - Use the most recent prior rate (carry-forward)
+- If no earlier rate exists at all:
+  - The API returns an error prompting the user to import rates first
 
 ---
 
@@ -99,29 +103,27 @@ sofr-accrual-app/
   server/
     src/
       db/
-        database.js         Opens SQLite database
-        init.js             Creates tables (no seeded demo data)
+        database.js          Opens SQLite database
+        init.js              Creates tables
       routes/
-        rates.js            GET /api/rates
-                            POST /api/rates/import-latest
-        calc.js             POST /api/calc
+        rates.js             GET /api/rates
+                             POST /api/rates/import-latest
+        calc.js              POST /api/calc (new: rateIndex + dayCount)
       services/
-        accrualService.js   ACT/ACT and ACT/360 accrual engines
-        calculationService.js Accrual method dispatcher
-        rateService.js      Daily rate mapping + carry-forward logic
+        accrualService.js    Daily Simple SOFR accrual engine
+        calculationService.js Selects engine based on rateIndex + dayCount
+        rateService.js       Daily rate mapping + carry-forward logic
         sofrImportService.js NY Fed SOFR import logic
       utils/
-        dates.js            Date helpers (inclusive ranges, day counts)
-      server.js             Express bootstrap
-    .env                    Local config (not committed)
-    package.json
+        dates.js             Date helpers (ranges, day-count utilities)
+      server.js              Express bootstrap
+    .env
 
   client/
     src/
-      App.jsx               UI, validation, CSV export, rate import
-      index.css             Theme variables + layout
-    vite.config.js          Dev server config
-    package.json
+      App.jsx                Updated UI with rateIndex + dayCount
+      index.css              Theme variables + layout
+    vite.config.js
 ```
 
 ---
@@ -131,6 +133,8 @@ sofr-accrual-app/
 ### Prerequisites
 - Node.js (LTS recommended)
 - npm
+
+---
 
 ### 1) Start the backend
 
@@ -143,14 +147,13 @@ npm run dev
 Backend runs at: `http://localhost:3001`
 
 Health check:
-
 ```bash
 curl http://localhost:3001/health
 ```
 
-### 2) Start the frontend
+---
 
-In a second terminal:
+### 2) Start the frontend
 
 ```bash
 cd client
@@ -178,29 +181,23 @@ DB_PATH=./data/app.db
 
 ### Import latest SOFR rates
 
+`POST /api/rates/import-latest`
+
 Imports recent SOFR fixings from the New York Fed and upserts them into SQLite.
 
-- `POST /api/rates/import-latest`
-
-Example:
-
-```bash
-curl -X POST http://localhost:3001/api/rates/import-latest
-```
+---
 
 ### Get base rates
 
-- `GET /api/rates?start=YYYY-MM-DD&end=YYYY-MM-DD`
+`GET /api/rates?start=YYYY-MM-DD&end=YYYY-MM-DD`
 
-Example:
+Returns the daily base rates (with carry-forward applied).
 
-```bash
-curl "http://localhost:3001/api/rates?start=2026-01-01&end=2026-01-10"
-```
+---
 
 ### Calculate accrual
 
-- `POST /api/calc`
+`POST /api/calc`
 
 Body:
 
@@ -208,18 +205,11 @@ Body:
 {
   "principal": 1000000,
   "spreadBps": 250,
-  "startDate": "2026-01-09",
-  "endDate": "2026-01-12",
-  "method": "TERM_SOFR_ACT_ACT"
+  "startDate": "2026-01-01",
+  "endDate": "2026-01-10",
+  "rateIndex": "SOFR_DAILY_SIMPLE",
+  "dayCount": "ACT_ACT"
 }
-```
-
-Example:
-
-```bash
-curl -X POST http://localhost:3001/api/calc \
-  -H "Content-Type: application/json" \
-  -d '{"principal":1000000,"spreadBps":250,"startDate":"2026-01-09","endDate":"2026-01-12","method":"TERM_SOFR_ACT_ACT"}'
 ```
 
 ---
@@ -227,25 +217,26 @@ curl -X POST http://localhost:3001/api/calc \
 ## Common issues
 
 ### “Missing base rate” error
-- No SOFR rates exist on or before the requested start date.
-- Fix: click **Import latest rates** in the UI or call the import endpoint.
+- No SOFR rates exist before the requested date range  
+- Fix: click **Import latest rates** in the UI  
 
 ### CORS errors
 Ensure:
 - backend is running on `3001`
 - frontend is running on `5173`
-- `CORS_ORIGIN` in `server/.env` matches the frontend URL
+- `CORS_ORIGIN` matches the frontend URL
 
 ---
 
 ## Roadmap ideas
 
+- CME Term SOFR support (1M, 3M)
 - Flag carried-forward days in the daily breakdown
-- Data freshness indicator (last SOFR date imported)
-- Unit tests for accrual engine
-- Rate admin UI (CSV upload)
+- Data freshness indicator (last imported SOFR date)
+- Unit tests for the accrual engine
 - Persist calculation history
 - Charts (daily accrual curve)
+- Inline “info” tooltips for rates, spreads, and conventions
 
 ---
 

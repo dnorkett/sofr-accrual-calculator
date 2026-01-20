@@ -88,8 +88,9 @@ export default function App() {
   const [startDate, setStartDate] = useState("2026-01-01");
   const [endDate, setEndDate] = useState("2026-01-10");
 
-  // Default method: TERM SOFR with ACT/ACT (365/366)
-  const [method, setMethod] = useState("TERM_SOFR_ACT_ACT");
+  // New: separate rate index and day-count convention
+  const [rateIndex, setRateIndex] = useState("SOFR_DAILY_SIMPLE");
+  const [dayCount, setDayCount] = useState("ACT_ACT");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -118,8 +119,15 @@ export default function App() {
   }
 
   const canSubmit = useMemo(() => {
-    return principal && spreadBps && startDate && endDate && method;
-  }, [principal, spreadBps, startDate, endDate, method]);
+    return (
+      principal &&
+      spreadBps &&
+      startDate &&
+      endDate &&
+      rateIndex &&
+      dayCount
+    );
+  }, [principal, spreadBps, startDate, endDate, rateIndex, dayCount]);
 
   async function importLatestRates() {
     if (importing) return;
@@ -171,7 +179,8 @@ export default function App() {
           spreadBps: Number(spreadBps),
           startDate,
           endDate,
-          method,
+          rateIndex,
+          dayCount,
         }),
       });
 
@@ -199,7 +208,8 @@ export default function App() {
       endDate: result.endDate,
       principal: result.principal,
       spreadBps: result.spreadBps,
-      method: result.method,
+      rateIndex: result.rateIndex,
+      dayCount: result.dayCount,
 
       date: r.date,
       baseRate: r.baseRate,
@@ -215,7 +225,8 @@ export default function App() {
       "endDate",
       "principal",
       "spreadBps",
-      "method",
+      "rateIndex",
+      "dayCount",
       "date",
       "baseRate",
       "spread",
@@ -295,18 +306,38 @@ export default function App() {
             </div>
           </div>
 
+          {/* New controls: reference rate + day count convention */}
           <div className="row" style={{ marginTop: 12 }}>
             <div>
-              <label>Day Count Convention</label>
-              <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                <option value="TERM_SOFR_ACT_ACT">TERM SOFR (ACT/ACT)</option>
-                <option value="TERM_SOFR_ACT_360">TERM SOFR (ACT/360)</option>
+              <label>Reference rate</label>
+              <select
+                value={rateIndex}
+                onChange={(e) => setRateIndex(e.target.value)}
+              >
+                {/* For now, only Daily Simple SOFR; TERM SOFR will come later */}
+                <option value="SOFR_DAILY_SIMPLE">
+                  SOFR – Daily Simple (overnight)
+                </option>
               </select>
             </div>
 
-            <div className="note" style={{ alignSelf: "end" }}>
-              The Secured Overnight Financing Rate (SOFR) is published daily by the Federal Reserve
-              Bank of New York on its website, usually around 8 a.m. ET on U.S. business days.
+            <div>
+              <label>Day count convention</label>
+              <select
+                value={dayCount}
+                onChange={(e) => setDayCount(e.target.value)}
+              >
+                <option value="ACT_ACT">Actual / Actual</option>
+                <option value="ACT_360">Actual / 360</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="row" style={{ marginTop: 12 }}>
+            <div className="note">
+              The Secured Overnight Financing Rate (SOFR) is published daily by
+              the Federal Reserve Bank of New York on its website, usually
+              around 8 a.m. ET on U.S. business days.
             </div>
           </div>
 
@@ -344,8 +375,12 @@ export default function App() {
                 <div className="value">{fmtMoney(result.totalAmount)}</div>
               </div>
               <div className="kpi">
-                <div className="label">Method</div>
-                <div className="value">{result.method}</div>
+                <div className="label">Reference rate</div>
+                <div className="value">{result.rateIndex}</div>
+              </div>
+              <div className="kpi">
+                <div className="label">Day count convention</div>
+                <div className="value">{result.dayCount}</div>
               </div>
             </div>
 

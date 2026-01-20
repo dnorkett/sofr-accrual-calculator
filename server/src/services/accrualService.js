@@ -1,4 +1,8 @@
-const { toISODate, eachDayInclusive, daysAct360Fraction } = require("../utils/dates");
+const {
+  toISODate,
+  eachDayInclusive,
+  daysAct360Fraction,
+} = require("../utils/dates");
 
 // Accept spread in basis points (bps) and convert to a decimal rate.
 // Example: 250 bps => 0.025
@@ -16,75 +20,36 @@ function daysInYearForISO(isoDate) {
   return isLeapYear(year) ? 366 : 365;
 }
 
-function calcTermSofrAct360({
-  principal,
-  spreadBps,
-  startDate,
-  endDate,
-  baseRatesByDate,
-}) {
-  const p = Number(principal);
-  if (!Number.isFinite(p) || p <= 0) {
-    throw new Error("Invalid principal. Must be a positive number.");
+function getDayCountFraction(isoDate, dayCount) {
+  if (dayCount === "ACT_360") {
+    // ACT/360: fixed 1/360 for each accrual day
+    return daysAct360Fraction(1); // 1 day ACT/360
   }
 
-  const spreadBpsNum = Number(spreadBps);
-  if (!Number.isFinite(spreadBpsNum) || spreadBpsNum < 0) {
-    throw new Error("Invalid spreadBps. Must be 0 or greater.");
+  if (dayCount === "ACT_ACT") {
+    // ACT/ACT: 1 / 365 or 1 / 366 based on calendar year
+    const denom = daysInYearForISO(isoDate);
+    return 1 / denom;
   }
 
-  const spread = bpsToDecimal(spreadBpsNum);
-  const days = eachDayInclusive(startDate, endDate);
-
-  const dcf = daysAct360Fraction(1); // 1 day ACT/360
-
-  let totalInterest = 0;
-  const daily = [];
-
-  for (const d of days) {
-    const iso = toISODate(d);
-    const baseRate = baseRatesByDate[iso];
-
-    if (baseRate == null) {
-      throw new Error(
-        `Missing base rate for ${iso}. Seed DB or extend rate range.`
-      );
-    }
-
-    const allInRate = baseRate + spread; // annualized decimal
-    const interest = p * allInRate * dcf;
-
-    totalInterest += interest;
-
-    daily.push({
-      date: iso,
-      baseRate,
-      spread,
-      allInRate,
-      dayCountFraction: dcf,
-      interest,
-      accruedToDate: totalInterest,
-    });
-  }
-
-  return {
-    method: "TERM_SOFR_ACT_360",
-    principal: p,
-    spreadBps: spreadBpsNum,
-    startDate,
-    endDate,
-    totalInterest,
-    totalAmount: p + totalInterest,
-    daily,
-  };
+  throw new Error(`Unsupported dayCount: ${dayCount}`);
 }
 
-function calcTermSofrActAct({
+/**
+ * Daily Simple SOFR accrual engine.
+ *
+ * - Uses daily SOFR base rates (already carry-forwarded)
+ * - Adds spread (bps) to form all-in rate
+ * - Applies day-count convention (ACT/ACT or ACT/360)
+ */
+function calcDailySimpleSofr({
   principal,
   spreadBps,
   startDate,
   endDate,
+  dayCount,
   baseRatesByDate,
+  rateIndex, // e.g. "SOFR_DAILY_SIMPLE"
 }) {
   const p = Number(principal);
   if (!Number.isFinite(p) || p <= 0) {
@@ -108,14 +73,12 @@ function calcTermSofrActAct({
 
     if (baseRate == null) {
       throw new Error(
-        `Missing base rate for ${iso}. Seed DB or extend rate range.`
+        `Missing base rate for ${iso}. Import SOFR rates or extend rate range.`
       );
     }
 
     const allInRate = baseRate + spread; // annualized decimal
-    const denom = daysInYearForISO(iso); // 365 or 366
-    const dcf = 1 / denom;
-
+    const dcf = getDayCountFraction(iso, dayCount);
     const interest = p * allInRate * dcf;
 
     totalInterest += interest;
@@ -132,7 +95,8 @@ function calcTermSofrActAct({
   }
 
   return {
-    method: "TERM_SOFR_ACT_ACT",
+    rateIndex: rateIndex || "SOFR_DAILY_SIMPLE",
+    dayCount,
     principal: p,
     spreadBps: spreadBpsNum,
     startDate,
@@ -143,4 +107,4 @@ function calcTermSofrActAct({
   };
 }
 
-module.exports = { calcTermSofrAct360, calcTermSofrActAct };
+module.exports = { calcDailySimpleSofr };
