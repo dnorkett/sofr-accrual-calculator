@@ -36,9 +36,20 @@ function getDayCountFraction(isoDate, dayCount) {
 }
 
 /**
- * Daily Simple SOFR accrual engine.
+ * Helper: shift an ISO date string (YYYY-MM-DD) by a number of days.
+ * Negative days = go backwards.
+ */
+function shiftISODate(isoDate, days) {
+  const d = new Date(isoDate + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Daily Simple SOFR accrual engine with lookback.
  *
- * - Uses daily SOFR base rates (already carry-forwarded)
+ * - Uses daily SOFR base rates (already carry-forwarded in baseRatesByDate)
+ * - For each accrual date D, uses the rate from observation date O = D - lookbackDays
  * - Adds spread (bps) to form all-in rate
  * - Applies day-count convention (ACT/ACT or ACT/360)
  */
@@ -49,7 +60,8 @@ function calcDailySimpleSofr({
   endDate,
   dayCount,
   baseRatesByDate,
-  rateIndex, // e.g. "SOFR_DAILY_SIMPLE"
+  rateIndex,     // e.g. "SOFR_DAILY_SIMPLE"
+  lookbackDays,  // integer, 0–99
 }) {
   const p = Number(principal);
   if (!Number.isFinite(p) || p <= 0) {
@@ -61,6 +73,8 @@ function calcDailySimpleSofr({
     throw new Error("Invalid spreadBps. Must be 0 or greater.");
   }
 
+  const lb = Number(lookbackDays) || 0;
+
   const spread = bpsToDecimal(spreadBpsNum);
   const days = eachDayInclusive(startDate, endDate);
 
@@ -68,23 +82,26 @@ function calcDailySimpleSofr({
   const daily = [];
 
   for (const d of days) {
-    const iso = toISODate(d);
-    const baseRate = baseRatesByDate[iso];
+    const accrualDate = toISODate(d);           // D
+    const observationDate = shiftISODate(accrualDate, -lb); // O = D - lb
+
+    const baseRate = baseRatesByDate[observationDate];
 
     if (baseRate == null) {
       throw new Error(
-        `Missing base rate for ${iso}. Import SOFR rates or extend rate range.`
+        `Missing base rate for observation date ${observationDate}. Import SOFR rates or extend rate range.`
       );
     }
 
     const allInRate = baseRate + spread; // annualized decimal
-    const dcf = getDayCountFraction(iso, dayCount);
+    const dcf = getDayCountFraction(accrualDate, dayCount);
     const interest = p * allInRate * dcf;
 
     totalInterest += interest;
 
     daily.push({
-      date: iso,
+      date: accrualDate,      // accrual date
+      observationDate,        // where the rate actually came from
       baseRate,
       spread,
       allInRate,
@@ -97,6 +114,7 @@ function calcDailySimpleSofr({
   return {
     rateIndex: rateIndex || "SOFR_DAILY_SIMPLE",
     dayCount,
+    lookbackDays: lb,
     principal: p,
     spreadBps: spreadBpsNum,
     startDate,

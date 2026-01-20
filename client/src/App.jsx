@@ -20,11 +20,12 @@ function fmtPctDecimalToPct(x) {
  * - Fast feedback near fields
  * - Still keep server-side validation later
  */
-function validate({ principal, spreadBps, startDate, endDate }) {
+function validate({ principal, spreadBps, startDate, endDate, lookbackDays }) {
   const errors = {};
 
   const p = Number(principal);
   const s = Number(spreadBps);
+  const l = Number(lookbackDays);
 
   if (!principal || Number.isNaN(p) || p <= 0) {
     errors.principal = "Enter a positive principal amount.";
@@ -44,6 +45,16 @@ function validate({ principal, spreadBps, startDate, endDate }) {
 
   if (startDate && endDate && endDate < startDate) {
     errors.endDate = "End date must be on or after start date.";
+  }
+
+  if (
+    lookbackDays === "" ||
+    Number.isNaN(l) ||
+    !Number.isInteger(l) ||
+    l < 0 ||
+    l > 99
+  ) {
+    errors.lookbackDays = "Enter an integer from 0 to 99.";
   }
 
   return errors;
@@ -88,9 +99,12 @@ export default function App() {
   const [startDate, setStartDate] = useState("2026-01-01");
   const [endDate, setEndDate] = useState("2026-01-10");
 
-  // New: separate rate index and day-count convention
+  // Rate/index settings
   const [rateIndex, setRateIndex] = useState("SOFR_DAILY_SIMPLE");
   const [dayCount, setDayCount] = useState("ACT_ACT");
+
+  // New: lookback days (0–99), default 5
+  const [lookbackDays, setLookbackDays] = useState("5");
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -107,8 +121,15 @@ export default function App() {
   }
 
   const currentErrors = useMemo(
-    () => validate({ principal, spreadBps, startDate, endDate }),
-    [principal, spreadBps, startDate, endDate]
+    () =>
+      validate({
+        principal,
+        spreadBps,
+        startDate,
+        endDate,
+        lookbackDays,
+      }),
+    [principal, spreadBps, startDate, endDate, lookbackDays]
   );
 
   const isValid = Object.keys(currentErrors).length === 0;
@@ -125,9 +146,10 @@ export default function App() {
       startDate &&
       endDate &&
       rateIndex &&
-      dayCount
+      dayCount &&
+      lookbackDays !== ""
     );
-  }, [principal, spreadBps, startDate, endDate, rateIndex, dayCount]);
+  }, [principal, spreadBps, startDate, endDate, rateIndex, dayCount, lookbackDays]);
 
   async function importLatestRates() {
     if (importing) return;
@@ -148,7 +170,7 @@ export default function App() {
 
       const note = data.note ? ` (${data.note})` : "";
       setImportMsg(
-        `Imported ${data.upsertedCount} rates (requested ${data.lookbackDaysRequested} days).${note}`
+        `Imported ${data.upsertedCount} rates (requested ${data.lookbackDaysRequested ?? data.lookbackDays ?? data.lookbackDaysRequested ?? data.lookbackDays} days).${note}`
       );
     } catch (e) {
       setImportMsg(e.message);
@@ -181,6 +203,7 @@ export default function App() {
           endDate,
           rateIndex,
           dayCount,
+          lookbackDays: Number(lookbackDays),
         }),
       });
 
@@ -210,6 +233,7 @@ export default function App() {
       spreadBps: result.spreadBps,
       rateIndex: result.rateIndex,
       dayCount: result.dayCount,
+      lookbackDays: result.lookbackDays,
 
       date: r.date,
       baseRate: r.baseRate,
@@ -227,6 +251,7 @@ export default function App() {
       "spreadBps",
       "rateIndex",
       "dayCount",
+      "lookbackDays",
       "date",
       "baseRate",
       "spread",
@@ -306,7 +331,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* New controls: reference rate + day count convention */}
+          {/* Rate, day-count, and lookback */}
           <div className="row" style={{ marginTop: 12 }}>
             <div>
               <label>Reference rate</label>
@@ -314,7 +339,6 @@ export default function App() {
                 value={rateIndex}
                 onChange={(e) => setRateIndex(e.target.value)}
               >
-                {/* For now, only Daily Simple SOFR; TERM SOFR will come later */}
                 <option value="SOFR_DAILY_SIMPLE">
                   SOFR – Daily Simple (overnight)
                 </option>
@@ -330,6 +354,29 @@ export default function App() {
                 <option value="ACT_ACT">Actual / Actual</option>
                 <option value="ACT_360">Actual / 360</option>
               </select>
+            </div>
+          </div>
+
+          <div className="row" style={{ marginTop: 12 }}>
+            <div>
+              <label>Lookback days</label>
+              <input
+                name="lookbackDays"
+                type="number"
+                min={0}
+                max={99}
+                step={1}
+                value={lookbackDays}
+                onChange={(e) => setLookbackDays(e.target.value)}
+                onBlur={() => touch("lookbackDays")}
+                inputMode="numeric"
+              />
+              <FieldError message={showError("lookbackDays")} />
+            </div>
+
+            <div className="note" style={{ alignSelf: "flex-end" }}>
+              For a lookback of N days, each day’s rate is taken from N days
+              earlier (with the same weekend/holiday carry-forward rules).
             </div>
           </div>
 
@@ -381,6 +428,10 @@ export default function App() {
               <div className="kpi">
                 <div className="label">Day count convention</div>
                 <div className="value">{result.dayCount}</div>
+              </div>
+              <div className="kpi">
+                <div className="label">Lookback days</div>
+                <div className="value">{result.lookbackDays}</div>
               </div>
             </div>
 

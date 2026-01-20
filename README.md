@@ -1,7 +1,7 @@
 # SOFR Interest Accrual Calculator
 **React + Express + SQLite**
 
-A project demonstrating a modern frontend communicating with a backend REST API to calculate loan interest using **Daily Simple SOFR** with selectable **day-count conventions**. Users enter loan inputs (principal, spread, dates), while SOFR base rates are sourced from the New York Fed, stored locally, and applied server-side using realistic daily accrual practices.
+A project demonstrating a modern frontend communicating with a backend REST API to calculate loan interest using **Daily Simple SOFR** with selectable **day-count conventions** and a configurable **lookback period**. Users enter loan inputs (principal, spread, dates), while SOFR base rates are sourced from the New York Fed, stored locally, and applied server-side using realistic daily accrual practices.
 
 ---
 
@@ -48,6 +48,7 @@ This project is intentionally designed to mirror real-world financial system des
   - End date  
   - **Reference rate** (currently: SOFR – Daily Simple)  
   - **Day-count convention** (ACT/ACT or ACT/360)
+  - **Lookback days** (0–99, default 5)
 
 - Interest is calculated **server-side**
 - Results include:
@@ -58,6 +59,9 @@ This project is intentionally designed to mirror real-world financial system des
 
 ### Accrual logic
 - Reference rate: **SOFR – Daily Simple**  
+- Lookback convention:
+  - For a lookback of **N** days, each accrual day uses the SOFR rate from **N calendar days earlier**
+  - Weekend/holiday carry-forward rules apply to the observation date
 - Day-count conventions:
   - **ACT/ACT** (365 or 366)
   - **ACT/360** (fixed 1/360)
@@ -73,24 +77,24 @@ This project is intentionally designed to mirror real-world financial system des
 
 ## Calculation assumptions (important)
 
-This project implements a simplified but realistic **Daily Simple SOFR** daily accrual model.
+This project implements a simplified but realistic **Daily Simple SOFR** accrual model with lookback.
 
 ### General rules
 - All-in rate = `baseRate + spread`
 - Base rates stored as decimals (e.g. 0.0364 = 3.64%)
 - Daily accrual happens **every calendar day**, even on weekends & holidays
 
+### Lookback days
+- Each accrual date **D** uses a SOFR rate observed on **D − N**
+- If no rate exists on the observation date:
+  - The most recent prior published rate is used
+- Observation dates are evaluated independently for each accrual day
+
 ### Day-count conventions
 - **ACT/ACT**  
   - Daily fraction = `1 / 365` or `1 / 366` depending on calendar year  
 - **ACT/360**  
   - Daily fraction = `1 / 360`
-
-### Missing rate days
-- If no SOFR exists for a date:
-  - Use the most recent prior rate (carry-forward)
-- If no earlier rate exists at all:
-  - The API returns an error prompting the user to import rates first
 
 ---
 
@@ -108,9 +112,9 @@ sofr-accrual-app/
       routes/
         rates.js             GET /api/rates
                              POST /api/rates/import-latest
-        calc.js              POST /api/calc (new: rateIndex + dayCount)
+        calc.js              POST /api/calc (rateIndex, dayCount, lookbackDays)
       services/
-        accrualService.js    Daily Simple SOFR accrual engine
+        accrualService.js    Daily Simple SOFR accrual engine with lookback
         calculationService.js Selects engine based on rateIndex + dayCount
         rateService.js       Daily rate mapping + carry-forward logic
         sofrImportService.js NY Fed SOFR import logic
@@ -121,7 +125,7 @@ sofr-accrual-app/
 
   client/
     src/
-      App.jsx                Updated UI with rateIndex + dayCount
+      App.jsx                UI with rateIndex, dayCount, lookbackDays
       index.css              Theme variables + layout
     vite.config.js
 ```
@@ -187,14 +191,6 @@ Imports recent SOFR fixings from the New York Fed and upserts them into SQLite.
 
 ---
 
-### Get base rates
-
-`GET /api/rates?start=YYYY-MM-DD&end=YYYY-MM-DD`
-
-Returns the daily base rates (with carry-forward applied).
-
----
-
 ### Calculate accrual
 
 `POST /api/calc`
@@ -208,7 +204,8 @@ Body:
   "startDate": "2026-01-01",
   "endDate": "2026-01-10",
   "rateIndex": "SOFR_DAILY_SIMPLE",
-  "dayCount": "ACT_ACT"
+  "dayCount": "ACT_ACT",
+  "lookbackDays": 5
 }
 ```
 
@@ -231,12 +228,13 @@ Ensure:
 ## Roadmap ideas
 
 - CME Term SOFR support (1M, 3M)
+- Support additional lookback conventions
 - Flag carried-forward days in the daily breakdown
 - Data freshness indicator (last imported SOFR date)
 - Unit tests for the accrual engine
+- Rate admin UI (CSV upload)
 - Persist calculation history
 - Charts (daily accrual curve)
-- Inline “info” tooltips for rates, spreads, and conventions
 
 ---
 

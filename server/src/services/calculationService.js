@@ -17,6 +17,7 @@ function calculateAccrual({
   endDate,
   rateIndex,
   dayCount,
+  lookbackDays,
   baseRatesByDate,
 }) {
   if (!SUPPORTED_RATE_INDEXES.has(rateIndex)) {
@@ -35,8 +36,21 @@ function calculateAccrual({
     );
   }
 
-  // For now, all supported rate indexes use the same daily simple SOFR engine.
-  // Later you can branch here if TERM SOFR uses different logic.
+  let lb = lookbackDays;
+  if (lb == null || lb === "") {
+    lb = 5; // default, if caller forgot
+  }
+  lb = Number(lb);
+
+  if (
+    !Number.isFinite(lb) ||
+    !Number.isInteger(lb) ||
+    lb < 0 ||
+    lb > 99
+  ) {
+    throw new Error("lookbackDays must be an integer between 0 and 99.");
+  }
+
   if (rateIndex === "SOFR_DAILY_SIMPLE") {
     return calcDailySimpleSofr({
       principal,
@@ -46,6 +60,7 @@ function calculateAccrual({
       dayCount,
       baseRatesByDate,
       rateIndex,
+      lookbackDays: lb,
     });
   }
 
